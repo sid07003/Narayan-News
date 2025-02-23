@@ -2,62 +2,54 @@ import React, { Component } from "react";
 import NewsItem from "./NewsItem";
 import Loading from "./Loading.js";
 
-export class News extends Component {
-  articles = [];
+const api_key = process.env.REACT_APP_API_KEY;
 
-  constructor() {
-    super();
+export class News extends Component {
+  constructor(props) {
+    super(props);
     this.state = {
-      articles: this.articles,
+      allArticles: [],
+      displayedArticles: [],
       loading: false,
       page: 1,
-      totalResults: this.totalResults,
+      articlesPerPage: 10,
     };
-    this.nextPage = this.nextPage.bind(this);
-    this.prevPage = this.prevPage.bind(this);
   }
-
-  nextPage = async () => {
-    if (this.state.page + 1 <= Math.ceil(this.state.totalResults / 14)) {
-      let url = `https://newsapi.org/v2/top-headlines?country=in&category=${this.props.category}&apiKey=12e08c55f819446db1fb99b97a97f054&page=${
-        this.state.page + 1
-      }&pagesize=14`;
-      this.setState({ loading: true });
-      let data = await fetch(url);
-      let fdata = await data.json();
-      this.setState({
-        articles: fdata.articles,
-        page: this.state.page + 1,
-        loading: false,
-      });
-    }
-  };
-
-  prevPage = async () => {
-    let url = `https://newsapi.org/v2/top-headlines?country=in&category=${this.props.category}&apiKey=12e08c55f819446db1fb99b97a97f054&page=${
-      this.state.page - 1
-    }&pagesize=14`;
-    this.setState({ loading: true });
-    let data = await fetch(url);
-    let fdata = await data.json();
-    this.setState({
-      articles: fdata.articles,
-      page: this.state.page - 1,
-      loading: false,
-    });
-  };
 
   async componentDidMount() {
-    let url = `https://newsapi.org/v2/top-headlines?country=in&category=${this.props.category}&apiKey=12e08c55f819446db1fb99b97a97f054&page=${this.state.page}&pagesize=14`;
     this.setState({ loading: true });
-    let data = await fetch(url);
-    let fdata = await data.json();
-    this.setState({
-      articles: fdata.articles,
-      totalResults: fdata.totalResults,
-      loading: false,
-    });
+    let url = `https://newsapi.org/v2/top-headlines?country=us&category=${this.props.category}&apiKey=${api_key}`;
+    
+    try {
+      let data = await fetch(url);
+      let fdata = await data.json();
+      
+      if (fdata.articles) {
+        this.setState({
+          allArticles: fdata.articles,
+          displayedArticles: fdata.articles.slice(0, this.state.articlesPerPage),
+          loading: false,
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      this.setState({ loading: false });
+    }
   }
+
+  handlePageChange = (direction) => {
+    const { page, articlesPerPage, allArticles } = this.state;
+    let newPage = direction === "next" ? page + 1 : page - 1;
+
+    let startIndex = (newPage - 1) * articlesPerPage;
+    let endIndex = startIndex + articlesPerPage;
+
+    this.setState({
+      page: newPage,
+      displayedArticles: allArticles.slice(startIndex, endIndex),
+    });
+  };
+
   render() {
     return (
       <div className="container my-4">
@@ -66,27 +58,17 @@ export class News extends Component {
         </h3>
         {this.state.loading && <Loading />}
         <div className="row my-4">
-          {!this.state.loading && this.state.articles.map((element) => {
-            console.log(element.articles);
-            return (
-              <div className="col-md-4 my-4 p-0">
+          {!this.state.loading &&
+            this.state.displayedArticles.map((element, index) => (
+              <div key={index} className="col-md-4 my-4 p-0">
                 <NewsItem
                   title={element.title ? element.title.slice(0, 40) : ""}
-                  description={
-                    element.description
-                      ? element.description.slice(0, 88)
-                      : "click read more to view"
-                  }
-                  url={
-                    element.urlToImage
-                      ? element.urlToImage
-                      : "https://www.yourfreecareertest.com/wp-content/uploads/2016/07/reporter.jpg"
-                  }
+                  description={element.description ? element.description.slice(0, 88) : "Click read more to view"}
+                  url={element.urlToImage || "https://www.yourfreecareertest.com/wp-content/uploads/2016/07/reporter.jpg"}
                   newsurl={element.url}
                 />
               </div>
-            );
-          })}
+            ))}
         </div>
 
         <div className="container d-flex justify-content-between">
@@ -94,17 +76,15 @@ export class News extends Component {
             disabled={this.state.page <= 1}
             type="button"
             className="btn btn-primary"
-            onClick={this.prevPage}
+            onClick={() => this.handlePageChange("prev")}
           >
             &larr; Prev
           </button>
           <button
-            disabled={
-              this.state.page + 1 > Math.ceil(this.state.totalResults / 14)
-            }
+            disabled={this.state.page * this.state.articlesPerPage >= this.state.allArticles.length}
             type="button"
-            className="btn btn-primary ml-100"
-            onClick={this.nextPage}
+            className="btn btn-primary"
+            onClick={() => this.handlePageChange("next")}
           >
             Next &rarr;
           </button>
